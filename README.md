@@ -1,60 +1,41 @@
-ESP-NOW cho ESP32/ESP8266
+ESP-NOW là gì?
 
-Giao tiếp peer-to-peer không cần router Wi-Fi, độ trễ ~<1 ms (lý tưởng), tiết kiệm năng lượng. Phù hợp cảm biến, điều khiển thời gian thực và IoT cục bộ.
+ESP-NOW là giao thức truyền thông không dây do Espressif phát triển dành cho ESP32 và ESP8266. Thay vì phải kết nối tới Access Point (AP) như Wi-Fi truyền thống, các thiết bị ESP giao tiếp trực tiếp với nhau (peer-to-peer), giúp giảm độ trễ, tiết kiệm năng lượng, và đơn giản hoá cấu hình mạng.
 
-Điểm chính
+Điểm nổi bật
 
-⚡ Độ trễ rất thấp · 🔋 Tiêu thụ điện thấp
+⚡ Độ trễ cực thấp: ~<1 ms (lý tưởng)
 
-📡 Tầm xa ~200 m (lý tưởng) · 🧱 ~250 B mỗi gói
+🔋 Tiết kiệm năng lượng: thấp hơn đáng kể so với Wi-Fi thông thường
 
-🔐 Hỗ trợ AES-128 theo từng peer
+📡 Tầm xa: đến ~200 m (không vật cản, cấu hình ăng-ten phù hợp)
 
-👥 Broadcast hoặc unicast nhiều thiết bị
+🧱 Kích thước dữ liệu: ~250 byte mỗi gói
 
-Kiến trúc nhanh
+🔐 Mã hoá: AES-128 (ESP32), chia sẻ key theo peer
 
-ESP-NOW dùng 802.11 action frames. Mỗi node có MAC riêng. Vai trò linh hoạt: controller / device / combo. Thực tế chỉ cần đăng ký peer (MAC, kênh, mã hóa) rồi esp_now_send().
+👥 Nhiều peer: gửi broadcast hoặc unicast đến nhiều thiết bị
 
-Ứng dụng
+Lưu ý: giá trị thực tế phụ thuộc môi trường, nhiễu RF, kiểu ăng-ten, nguồn, firmware, v.v.
 
-Cảm biến không dây · Nút bấm/điều khiển relay · Thu thập dữ liệu công nghiệp · Bài toán cần độ trễ thấp.
+Kiến trúc & cách hoạt động
 
-Ví dụ tối giản (Arduino)
-#include <Arduino.h>
-#ifdef ESP32
-  #include <WiFi.h>
-  #include <esp_now.h>
-#else
-  #include <ESP8266WiFi.h>
-  extern "C" { #include <espnow.h> }
-#endif
+ESP-NOW sử dụng 802.11 action frames để truyền dữ liệu. Mỗi thiết bị có địa chỉ MAC duy nhất. Về logic, có thể hình dung 3 vai trò:
 
-uint8_t bcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+Controller: khởi phát/gửi lệnh, điều phối
 
-void onSend(const uint8_t*, esp_now_send_status_t s){ Serial.println(s==ESP_NOW_SEND_SUCCESS?"OK":"FAIL"); }
-void onRecv(const uint8_t*, const uint8_t*, int len){ Serial.printf("Recv %dB\n", len); }
+Slave/Device: phản hồi/nhận lệnh
 
-void setup() {
-  Serial.begin(115200); WiFi.mode(WIFI_STA);
-#ifdef ESP32
-  if (esp_now_init()!=ESP_OK) { Serial.println("Init ERR"); return; }
-  esp_now_register_send_cb(onSend); esp_now_register_recv_cb(onRecv);
-  esp_now_peer_info_t p{}; memcpy(p.peer_addr,bcast,6); p.channel=0; p.encrypt=false; esp_now_add_peer(&p);
-#else
-  if (esp_now_init()!=0){ Serial.println("Init ERR"); return; }
-  esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-  esp_now_register_send_cb((esp_now_send_cb_t)onSend);
-  esp_now_register_recv_cb((esp_now_recv_cb_t)onRecv);
-  esp_now_add_peer(bcast, ESP_NOW_ROLE_COMBO, 0, NULL, 0);
-#endif
-}
-void loop(){ const char msg[]="hello"; esp_now_send(bcast,(uint8_t*)msg,sizeof(msg)); delay(1000); }
+Combo: vừa gửi vừa nhận
 
-Ghi chú nhanh
+Trên thực tế, bạn chỉ cần đăng ký peer theo MAC, cấu hình kênh, mã hoá (nếu cần) và sử dụng API esp_now_send() / callback nhận dữ liệu.
 
-Gói >250 B: hãy chia nhỏ + gắn sequence ID.
+Ứng dụng điển hình
 
-Cố định kênh Wi-Fi giữa các node; quản lý danh sách peer để tránh tràn RAM.
+🌡️ Mạng cảm biến không dây: nhiệt độ, độ ẩm, chuyển động, cửa từ…
 
-Đồng tồn tại với Wi-Fi Internet được, miễn cùng kênh.
+🎛️ Điều khiển thời gian thực: đèn, relay, động cơ, robot mini…
+
+🏭 Giám sát công nghiệp: thu thập dữ liệu cục bộ, phản hồi nhanh
+
+⏱️ Hệ thống cần độ trễ thấp: nút bấm không dây, game controller DIY…
